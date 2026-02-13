@@ -12,6 +12,7 @@ pipeline {
        INTERNAL_PORT = "5000"
        EXTERNAL_PORT = "${PORT_EXPOSED}"
        CONTAINER_IMAGE = "${ID_DOCKER}/${IMAGE_NAME}:${IMAGE_TAG}"
+       IMAGE_URL ="http://192.168.56.100/"
 
      }
      agent none
@@ -42,7 +43,7 @@ pipeline {
            steps {
               script {
                 sh '''
-                    curl http://localhost:${PORT_EXPOSED} | grep -q "Hello world!"
+                    curl http://192.168.56.100:${PORT_EXPOSED} | grep -q "Hello world!"
                 '''
               }
            }
