@@ -1,10 +1,9 @@
 pipeline {
     environment {
-        //  ID_DOCKER = "${ID_DOCKER_PARAMS}"
         ID_DOCKER = 'hyann'
         IMAGE_NAME = 'alpinehelloworld'
         IMAGE_TAG = 'latest'
-        PORT_EXPOSED = '80' // à paraméter dans le job obligatoirement
+        PORT_EXPOSED = '80'
         APP_NAME = 'hyann-consulting'
         STG_API_ENDPOINT = 'ip10-0-1-3-cc7bafssrdn0fvnms4tg-1993.direct.docker.labs.eazytraining.fr'
         STG_APP_ENDPOINT = 'ip10-0-1-3-cc7bafssrdn0fvnms4tg-80.direct.docker.labs.eazytraining.fr'
@@ -31,10 +30,10 @@ pipeline {
                 script {
                     sh '''
                     echo "Clean Environment"
-                    docker rm -f $IMAGE_NAME || echo "container does not exist"
+                    docker rm -f $IMAGE_NAME || true
                     docker run --name $IMAGE_NAME -d -p ${PORT_EXPOSED}:${INTERNAL_PORT} -e PORT=${INTERNAL_PORT} ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
                     sleep 5
-                 '''
+                    '''
                 }
             }
         }
@@ -44,7 +43,7 @@ pipeline {
                 script {
                     sh '''
                     curl ${IMAGE_URL}:${PORT_EXPOSED} | grep -q "Hello world!"
-                '''
+                    '''
                 }
             }
         }
@@ -53,67 +52,76 @@ pipeline {
             steps {
                 script {
                     sh '''
-                 docker stop $IMAGE_NAME
-                 docker rm $IMAGE_NAME
-               '''
+                    docker stop $IMAGE_NAME || true
+                    docker rm $IMAGE_NAME || true
+                    '''
                 }
             }
         }
-
         stage('Save Artefact') {
             agent any
             steps {
                 script {
                     sh '''
-                 docker save  ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG > /tmp/alpinehelloworld.tar
-               '''
+                    docker save ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG > /tmp/alpinehelloworld.tar
+                    '''
                 }
             }
         }
-
         stage('Login and Push Image on docker hub') {
             agent any
             environment {
-                DOCKERHUB_PASSWORD  = credentials('dockerhub-credentials')
+                DOCKERHUB_PASSWORD = credentials('dockerhub-credentials')
             }
             steps {
                 script {
                     sh '''
-                   echo $DOCKERHUB_PASSWORD_PSW | docker login -u $ID_DOCKER --password-stdin
-                   docker push ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
-               '''
+                    echo $DOCKERHUB_PASSWORD_PSW | docker login -u $ID_DOCKER --password-stdin
+                    docker push ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
+                    '''
                 }
             }
         }
-
         stage('STAGING - Deploy app') {
             agent any
             steps {
                 script {
-                    sh """
-              echo  {\\"your_name\\":\\"${APP_NAME}\\",\\"container_image\\":\\"${CONTAINER_IMAGE}\\", \\"external_port\\":\\"${EXTERNAL_PORT}\\", \\"internal_port\\":\\"${INTERNAL_PORT}\\"}  > data.json
-              curl -X POST http://${STG_API_ENDPOINT}/staging -H 'Content-Type: application/json'  --data-binary @data.json
-            """
+                    sh '''
+                    cat > data.json <<EOF
+{
+  "your_name": "${APP_NAME}",
+  "container_image": "${CONTAINER_IMAGE}",
+  "external_port": "${EXTERNAL_PORT}",
+  "internal_port": "${INTERNAL_PORT}"
+}
+EOF
+                    curl -X POST http://${STG_API_ENDPOINT}/staging -H 'Content-Type: application/json' --data-binary @data.json
+                    '''
                 }
             }
         }
-
         stage('PRODUCTION - Deploy app') {
             when {
-                expression { GIT_BRANCH == 'origin/master' }
+                expression { env.GIT_BRANCH == 'origin/master' }
             }
             agent any
-
             steps {
                 script {
-                    sh """
-               curl -X POST http://${PROD_API_ENDPOINT}/prod -H 'Content-Type: application/json' -d '{"your_name":"${APP_NAME}","container_image":"${CONTAINER_IMAGE}", "external_port":"${EXTERNAL_PORT}", "internal_port":"${INTERNAL_PORT}"}'
-               """
+                    sh '''
+                    cat > data.json <<EOF
+{
+  "your_name": "${APP_NAME}",
+  "container_image": "${CONTAINER_IMAGE}",
+  "external_port": "${EXTERNAL_PORT}",
+  "internal_port": "${INTERNAL_PORT}"
+}
+EOF
+                    curl -X POST http://${PROD_API_ENDPOINT}/prod -H 'Content-Type: application/json' --data-binary @data.json
+                    '''
                 }
             }
         }
     }
-
     post {
         success {
             echo "✅ SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' completed successfully"
