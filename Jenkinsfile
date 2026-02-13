@@ -1,10 +1,11 @@
 pipeline {
      environment {
-       ID_DOCKER = "${ID_DOCKER_PARAMS}"
+     //  ID_DOCKER = "${ID_DOCKER_PARAMS}"
+       ID_DOCKER = "hyann"
        IMAGE_NAME = "alpinehelloworld"
        IMAGE_TAG = "latest"
        PORT_EXPOSED = "80" // à paraméter dans le job obligatoirement
-       APP_NAME = "ulrich"
+       APP_NAME = "hyann-consulting"
        STG_API_ENDPOINT = "ip10-0-1-3-cc7bafssrdn0fvnms4tg-1993.direct.docker.labs.eazytraining.fr"
        STG_APP_ENDPOINT = "ip10-0-1-3-cc7bafssrdn0fvnms4tg-80.direct.docker.labs.eazytraining.fr"
        PROD_API_ENDPOINT = "ip10-0-1-4-cc7bafssrdn0fvnms4tg-1993.direct.docker.labs.eazytraining.fr"
@@ -12,7 +13,7 @@ pipeline {
        INTERNAL_PORT = "5000"
        EXTERNAL_PORT = "${PORT_EXPOSED}"
        CONTAINER_IMAGE = "${ID_DOCKER}/${IMAGE_NAME}:${IMAGE_TAG}"
-       IMAGE_URL ="http://192.168.56.100/"
+       IMAGE_URL ="http://192.168.56.100"
 
      }
      agent none
@@ -43,7 +44,7 @@ pipeline {
            steps {
               script {
                 sh '''
-                    curl http://192.168.56.100:${PORT_EXPOSED} | grep -q "Hello world!"
+                    curl ${IMAGE_URL}:${PORT_EXPOSED} | grep -q "Hello world!"
                 '''
               }
            }
